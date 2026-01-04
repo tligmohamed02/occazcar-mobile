@@ -42,7 +42,13 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   Future<void> _markAsRead(int notificationId) async {
     try {
       await _apiService.markNotificationAsRead(notificationId);
-      _loadNotifications();
+      // Mettre à jour l'état local immédiatement
+      setState(() {
+        final index = _notifications.indexWhere((n) => n['id'] == notificationId);
+        if (index != -1) {
+          _notifications[index]['isRead'] = true;
+        }
+      });
     } catch (e) {
       // Silencieux
     }
@@ -97,8 +103,12 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   }
 
   void _handleNotificationTap(Map<String, dynamic> notification) {
-    _markAsRead(notification['id']);
+    // Marquer comme lue immédiatement
+    if (notification['isRead'] == false) {
+      _markAsRead(notification['id']);
+    }
 
+    // Naviguer vers le véhicule si applicable
     if (notification['type'] == 'NEW_VEHICLE' &&
         notification['relatedEntityId'] != null) {
       Navigator.of(context).push(

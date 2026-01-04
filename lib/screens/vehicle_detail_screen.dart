@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../models/models.dart';
 import '../services/api_service.dart';
 import 'chat_screen.dart';
@@ -20,37 +19,22 @@ class _VehicleDetailScreenState extends State<VehicleDetailScreen> {
   final _priceController = TextEditingController();
   final _messageController = TextEditingController();
   int _currentPhotoIndex = 0;
-  int? _currentUserId;
 
   @override
   void initState() {
     super.initState();
-    _loadCurrentUser();
     _loadVehicle();
-  }
-
-  Future<void> _loadCurrentUser() async {
-    final prefs = await SharedPreferences.getInstance();
-    final userId = prefs.getInt('userId');
-    if (mounted) {
-      setState(() {
-        _currentUserId = userId;
-      });
-    }
   }
 
   Future<void> _loadVehicle() async {
     try {
       final vehicle = await _apiService.getVehicle(widget.vehicleId);
-      if (mounted) {
-        setState(() {
-          _vehicle = vehicle;
-          _isLoading = false;
-        });
-      }
+      setState(() {
+        _vehicle = vehicle;
+        _isLoading = false;
+      });
     } catch (e) {
       if (mounted) {
-        setState(() => _isLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Erreur: ${e.toString()}')),
         );
@@ -59,13 +43,14 @@ class _VehicleDetailScreenState extends State<VehicleDetailScreen> {
     }
   }
 
-  bool _isOwner() {
-    return _currentUserId != null &&
-        _vehicle != null &&
-        _currentUserId == _vehicle!.sellerId;
-  }
-
   Future<void> _makeOffer() async {
+    if (_vehicle?.status == 'VENDU') {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Ce véhicule a déjà été vendu')),
+      );
+      return;
+    }
+
     if (_priceController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Veuillez saisir un prix')),
@@ -96,6 +81,16 @@ class _VehicleDetailScreenState extends State<VehicleDetailScreen> {
   }
 
   void _showOfferDialog() {
+    if (_vehicle?.status == 'VENDU') {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Ce véhicule a déjà été vendu'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -139,8 +134,6 @@ class _VehicleDetailScreenState extends State<VehicleDetailScreen> {
   }
 
   void _openChat() {
-    if (_vehicle == null) return;
-
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (context) => ChatScreen(
@@ -167,7 +160,7 @@ class _VehicleDetailScreenState extends State<VehicleDetailScreen> {
       );
     }
 
-    final isOwner = _isOwner();
+    final isVendu = _vehicle!.status == 'VENDU';
 
     return Scaffold(
       appBar: AppBar(
@@ -177,57 +170,91 @@ class _VehicleDetailScreenState extends State<VehicleDetailScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Photos carousel
-            SizedBox(
-              height: 250,
-              child: _vehicle!.photos.isEmpty
-                  ? Container(
-                color: Colors.grey[300],
-                child: const Center(
-                  child: Icon(Icons.directions_car,
-                      size: 100, color: Colors.grey),
-                ),
-              )
-                  : Stack(
-                children: [
-                  PageView.builder(
-                    itemCount: _vehicle!.photos.length,
-                    onPageChanged: (index) {
-                      setState(() => _currentPhotoIndex = index);
-                    },
-                    itemBuilder: (context, index) {
-                      return Image.network(
-                        'http://10.0.2.2:8085${_vehicle!.photos[index]}',
-                        fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) {
-                          return Container(
-                            color: Colors.grey[300],
-                            child: const Icon(Icons.broken_image, size: 100),
+            // Photos carousel avec badge VENDU
+            Stack(
+              children: [
+                SizedBox(
+                  height: 250,
+                  child: _vehicle!.photos.isEmpty
+                      ? Container(
+                    color: Colors.grey[300],
+                    child: const Center(
+                      child: Icon(Icons.directions_car,
+                          size: 100, color: Colors.grey),
+                    ),
+                  )
+                      : Stack(
+                    children: [
+                      PageView.builder(
+                        itemCount: _vehicle!.photos.length,
+                        onPageChanged: (index) {
+                          setState(() => _currentPhotoIndex = index);
+                        },
+                        itemBuilder: (context, index) {
+                          return Image.network(
+                            'http://10.0.2.2:8085${_vehicle!.photos[index]}',
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) {
+                              return Container(
+                                color: Colors.grey[300],
+                                child: const Icon(Icons.broken_image, size: 100),
+                              );
+                            },
                           );
                         },
-                      );
-                    },
+                      ),
+                      Positioned(
+                        bottom: 10,
+                        right: 10,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.black54,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            '${_currentPhotoIndex + 1}/${_vehicle!.photos.length}',
+                            style: const TextStyle(color: Colors.white),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
+                ),
+                if (isVendu)
                   Positioned(
-                    bottom: 10,
-                    right: 10,
+                    top: 20,
+                    left: 20,
                     child: Container(
                       padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 4,
+                        horizontal: 16,
+                        vertical: 8,
                       ),
                       decoration: BoxDecoration(
-                        color: Colors.black54,
-                        borderRadius: BorderRadius.circular(12),
+                        color: Colors.red,
+                        borderRadius: BorderRadius.circular(8),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.3),
+                            blurRadius: 8,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
                       ),
-                      child: Text(
-                        '${_currentPhotoIndex + 1}/${_vehicle!.photos.length}',
-                        style: const TextStyle(color: Colors.white),
+                      child: const Text(
+                        'VENDU',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ),
                   ),
-                ],
-              ),
+              ],
             ),
             Padding(
               padding: const EdgeInsets.all(16.0),
@@ -240,17 +267,18 @@ class _VehicleDetailScreenState extends State<VehicleDetailScreen> {
                       Expanded(
                         child: Text(
                           '${_vehicle!.brand} ${_vehicle!.model}',
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 24,
                             fontWeight: FontWeight.bold,
+                            color: isVendu ? Colors.grey : Colors.black,
                           ),
                         ),
                       ),
                       Text(
                         '${_vehicle!.price.toStringAsFixed(0)} TND',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 24,
-                          color: Colors.green,
+                          color: isVendu ? Colors.grey : Colors.green,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
@@ -289,10 +317,32 @@ class _VehicleDetailScreenState extends State<VehicleDetailScreen> {
                   Text('Nom: ${_vehicle!.sellerName}'),
                   if (_vehicle!.sellerPhone != null)
                     Text('Tél: ${_vehicle!.sellerPhone}'),
-
-                  // Afficher les boutons seulement si l'utilisateur n'est PAS le propriétaire
-                  if (!isOwner) ...[
-                    const SizedBox(height: 24),
+                  const SizedBox(height: 24),
+                  if (isVendu)
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.red.shade50,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.red),
+                      ),
+                      child: const Row(
+                        children: [
+                          Icon(Icons.info_outline, color: Colors.red),
+                          SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              'Ce véhicule a été vendu et n\'est plus disponible',
+                              style: TextStyle(
+                                color: Colors.red,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
+                  else
                     Row(
                       children: [
                         Expanded(
@@ -318,28 +368,6 @@ class _VehicleDetailScreenState extends State<VehicleDetailScreen> {
                         ),
                       ],
                     ),
-                  ] else ...[
-                    const SizedBox(height: 16),
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: Colors.blue.shade50,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: const Row(
-                        children: [
-                          Icon(Icons.info_outline, color: Colors.blue),
-                          SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              'C\'est votre annonce',
-                              style: TextStyle(color: Colors.blue),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
                 ],
               ),
             ),

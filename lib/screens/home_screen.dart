@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:async';
 import '../models/models.dart';
 import '../services/api_service.dart';
 import 'search_screen.dart';
@@ -17,24 +18,45 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   final _apiService = ApiService();
   int _currentIndex = 0;
   int _unreadNotificationsCount = 0;
+  Timer? _notificationTimer;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _loadUnreadCount();
-    // Rafraîchir le compteur toutes les 30 secondes
-    Future.delayed(const Duration(seconds: 30), _periodicRefresh);
+    _startNotificationPolling();
   }
 
-  void _periodicRefresh() {
-    if (mounted) {
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _notificationTimer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Rafraîchir quand l'app revient au premier plan
+    if (state == AppLifecycleState.resumed) {
       _loadUnreadCount();
-      Future.delayed(const Duration(seconds: 30), _periodicRefresh);
     }
+  }
+
+  void _startNotificationPolling() {
+    // Vérifier les notifications toutes les 10 secondes
+    _notificationTimer = Timer.periodic(
+      const Duration(seconds: 10),
+          (timer) {
+        if (mounted) {
+          _loadUnreadCount();
+        }
+      },
+    );
   }
 
   Future<void> _loadUnreadCount() async {
@@ -121,7 +143,10 @@ class _HomeScreenState extends State<HomeScreen> {
                     MaterialPageRoute(
                       builder: (context) => const NotificationsScreen(),
                     ),
-                  ).then((_) => _loadUnreadCount());
+                  ).then((_) {
+                    // Rafraîchir immédiatement après le retour
+                    _loadUnreadCount();
+                  });
                 },
               ),
               if (_unreadNotificationsCount > 0)
