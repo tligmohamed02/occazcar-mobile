@@ -26,28 +26,32 @@ class _MyOffersScreenState extends State<MyOffersScreen> {
 
     try {
       // Essayer de charger les offres vendeur d'abord
-      final sellerOffers = await _apiService.getSellerOffers();
-      setState(() {
-        _offers = sellerOffers;
-        _userRole = 'VENDEUR';
-        _isLoading = false;
-      });
-    } catch (e) {
-      // Si ça échoue, charger les offres acheteur
       try {
-        final buyerOffers = await _apiService.getBuyerOffers();
-        setState(() {
-          _offers = buyerOffers;
-          _userRole = 'ACHETEUR';
-          _isLoading = false;
-        });
-      } catch (e2) {
+        final sellerOffers = await _apiService.getSellerOffers();
         if (mounted) {
-          setState(() => _isLoading = false);
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Erreur: ${e2.toString()}')),
-          );
+          setState(() {
+            _offers = sellerOffers;
+            _userRole = 'VENDEUR';
+            _isLoading = false;
+          });
         }
+      } catch (e) {
+        // Si ça échoue, charger les offres acheteur
+        final buyerOffers = await _apiService.getBuyerOffers();
+        if (mounted) {
+          setState(() {
+            _offers = buyerOffers;
+            _userRole = 'ACHETEUR';
+            _isLoading = false;
+          });
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erreur: ${e.toString()}')),
+        );
       }
     }
   }

@@ -8,6 +8,7 @@ import 'my_offers_screen.dart';
 import 'add_vehicle_screen.dart';
 import 'conversations_screen.dart';
 import 'notifications_screen.dart';
+import 'login_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   final User user;
@@ -41,14 +42,12 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    // Rafraîchir quand l'app revient au premier plan
     if (state == AppLifecycleState.resumed) {
       _loadUnreadCount();
     }
   }
 
   void _startNotificationPolling() {
-    // Vérifier les notifications toutes les 10 secondes
     _notificationTimer = Timer.periodic(
       const Duration(seconds: 10),
           (timer) {
@@ -67,6 +66,40 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       }
     } catch (e) {
       // Silencieux
+    }
+  }
+
+  Future<void> _logout() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Déconnexion'),
+        content: const Text('Voulez-vous vraiment vous déconnecter ?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Annuler'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Déconnexion'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      await _apiService.clearToken();
+      if (mounted) {
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (context) => const LoginScreen()),
+              (route) => false,
+        );
+      }
     }
   }
 
@@ -144,7 +177,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                       builder: (context) => const NotificationsScreen(),
                     ),
                   ).then((_) {
-                    // Rafraîchir immédiatement après le retour
                     _loadUnreadCount();
                   });
                 },
@@ -178,33 +210,63 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 ),
             ],
           ),
-          IconButton(
+          PopupMenuButton<String>(
             icon: const Icon(Icons.person),
-            onPressed: () {
-              showDialog(
-                context: context,
-                builder: (context) => AlertDialog(
-                  title: const Text('Profil'),
-                  content: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('Nom: ${widget.user.fullName}'),
-                      Text('Email: ${widget.user.email}'),
-                      Text('Rôle: ${widget.user.role}'),
-                      if (widget.user.phone != null)
-                        Text('Tél: ${widget.user.phone}'),
+            onSelected: (value) {
+              if (value == 'profile') {
+                showDialog(
+                  context: context,
+                  builder: (context) => AlertDialog(
+                    title: const Text('Profil'),
+                    content: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Nom: ${widget.user.fullName}'),
+                        const SizedBox(height: 8),
+                        Text('Email: ${widget.user.email}'),
+                        const SizedBox(height: 8),
+                        Text('Rôle: ${widget.user.role}'),
+                        if (widget.user.phone != null) ...[
+                          const SizedBox(height: 8),
+                          Text('Tél: ${widget.user.phone}'),
+                        ],
+                      ],
+                    ),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: const Text('Fermer'),
+                      ),
                     ],
                   ),
-                  actions: [
-                    TextButton(
-                      onPressed: () => Navigator.pop(context),
-                      child: const Text('Fermer'),
-                    ),
+                );
+              } else if (value == 'logout') {
+                _logout();
+              }
+            },
+            itemBuilder: (context) => [
+              const PopupMenuItem(
+                value: 'profile',
+                child: Row(
+                  children: [
+                    Icon(Icons.person, size: 20),
+                    SizedBox(width: 12),
+                    Text('Mon profil'),
                   ],
                 ),
-              );
-            },
+              ),
+              const PopupMenuItem(
+                value: 'logout',
+                child: Row(
+                  children: [
+                    Icon(Icons.logout, size: 20, color: Colors.red),
+                    SizedBox(width: 12),
+                    Text('Déconnexion', style: TextStyle(color: Colors.red)),
+                  ],
+                ),
+              ),
+            ],
           ),
         ],
       ),

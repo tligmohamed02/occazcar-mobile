@@ -34,7 +34,7 @@ class ApiService {
     return headers;
   }
 
-  // Auth
+  // ==================== AUTH ====================
   Future<User> register(String email, String password, String fullName,
       String role, String? phone) async {
     final response = await http.post(
@@ -77,7 +77,7 @@ class ApiService {
     }
   }
 
-  // Vehicles
+  // ==================== VEHICLES ====================
   Future<List<Vehicle>> searchVehicles({
     String? brand,
     String? model,
@@ -152,7 +152,7 @@ class ApiService {
     }
   }
 
-  // Upload Photos
+  // ==================== PHOTOS ====================
   Future<Vehicle> uploadPhotos(int vehicleId, List<File> photos) async {
     await _loadToken();
 
@@ -189,7 +189,7 @@ class ApiService {
     }
   }
 
-  // Offers
+  // ==================== OFFERS ====================
   Future<Offer> createOffer(int vehicleId, double proposedPrice,
       String? message) async {
     await _loadToken();
@@ -255,7 +255,7 @@ class ApiService {
     }
   }
 
-  // Messages
+  // ==================== MESSAGES ====================
   Future<Message> sendMessage(int vehicleId, int receiverId,
       String content) async {
     await _loadToken();
@@ -314,50 +314,81 @@ class ApiService {
     );
   }
 
-  // Notifications
+  // ==================== NOTIFICATIONS ====================
   Future<List<Map<String, dynamic>>> getNotifications() async {
     await _loadToken();
-    final response = await http.get(
-      Uri.parse('$baseUrl/notifications'),
-      headers: _getHeaders(),
-    );
 
-    if (response.statusCode == 200) {
-      final List<dynamic> data = jsonDecode(response.body);
-      return data.cast<Map<String, dynamic>>();
-    } else {
-      throw Exception('Erreur lors du chargement des notifications');
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/notifications'),
+        headers: _getHeaders(),
+      );
+
+      print('Notifications response status: ${response.statusCode}');
+      print('Notifications response body: ${response.body}');
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = jsonDecode(response.body);
+        return data.cast<Map<String, dynamic>>();
+      } else {
+        throw Exception('Erreur ${response.statusCode}: ${response.body}');
+      }
+    } catch (e) {
+      print('Erreur lors du chargement des notifications: $e');
+      throw Exception('Impossible de charger les notifications: $e');
     }
   }
 
   Future<int> getUnreadNotificationsCount() async {
     await _loadToken();
-    final response = await http.get(
-      Uri.parse('$baseUrl/notifications/unread-count'),
-      headers: _getHeaders(),
-    );
 
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      return data['count'] ?? 0;
-    } else {
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/notifications/unread-count'),
+        headers: _getHeaders(),
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return data['count'] ?? 0;
+      } else {
+        print('Erreur unread count: ${response.statusCode}');
+        return 0;
+      }
+    } catch (e) {
+      print('Erreur comptage notifications: $e');
       return 0;
     }
   }
 
   Future<void> markNotificationAsRead(int notificationId) async {
     await _loadToken();
-    await http.put(
-      Uri.parse('$baseUrl/notifications/$notificationId/read'),
-      headers: _getHeaders(),
-    );
+
+    try {
+      await http.put(
+        Uri.parse('$baseUrl/notifications/$notificationId/read'),
+        headers: _getHeaders(),
+      );
+    } catch (e) {
+      print('Erreur marquage notification: $e');
+    }
   }
 
   Future<void> markAllNotificationsAsRead() async {
     await _loadToken();
-    await http.put(
-      Uri.parse('$baseUrl/notifications/mark-all-read'),
-      headers: _getHeaders(),
-    );
+
+    try {
+      final response = await http.put(
+        Uri.parse('$baseUrl/notifications/mark-all-read'),
+        headers: _getHeaders(),
+      );
+
+      if (response.statusCode != 200) {
+        throw Exception(response.body);
+      }
+    } catch (e) {
+      print('Erreur marquage toutes notifications: $e');
+      throw Exception('Erreur lors du marquage: $e');
+    }
   }
 }
