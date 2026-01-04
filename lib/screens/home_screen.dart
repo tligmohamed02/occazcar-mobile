@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import '../models/models.dart';
+import '../services/api_service.dart';
 import 'search_screen.dart';
 import 'my_vehicles_screen.dart';
 import 'my_offers_screen.dart';
 import 'add_vehicle_screen.dart';
 import 'conversations_screen.dart';
+import 'notifications_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   final User user;
@@ -16,7 +18,35 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  final _apiService = ApiService();
   int _currentIndex = 0;
+  int _unreadNotificationsCount = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUnreadCount();
+    // Rafraîchir le compteur toutes les 30 secondes
+    Future.delayed(const Duration(seconds: 30), _periodicRefresh);
+  }
+
+  void _periodicRefresh() {
+    if (mounted) {
+      _loadUnreadCount();
+      Future.delayed(const Duration(seconds: 30), _periodicRefresh);
+    }
+  }
+
+  Future<void> _loadUnreadCount() async {
+    try {
+      final count = await _apiService.getUnreadNotificationsCount();
+      if (mounted) {
+        setState(() => _unreadNotificationsCount = count);
+      }
+    } catch (e) {
+      // Silencieux
+    }
+  }
 
   List<Widget> _getPages() {
     if (widget.user.role == 'VENDEUR') {
@@ -81,6 +111,48 @@ class _HomeScreenState extends State<HomeScreen> {
       appBar: AppBar(
         title: const Text('OccazCar'),
         actions: [
+          // Badge de notifications
+          Stack(
+            children: [
+              IconButton(
+                icon: const Icon(Icons.notifications),
+                onPressed: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (context) => const NotificationsScreen(),
+                    ),
+                  ).then((_) => _loadUnreadCount());
+                },
+              ),
+              if (_unreadNotificationsCount > 0)
+                Positioned(
+                  right: 8,
+                  top: 8,
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: const BoxDecoration(
+                      color: Colors.red,
+                      shape: BoxShape.circle,
+                    ),
+                    constraints: const BoxConstraints(
+                      minWidth: 16,
+                      minHeight: 16,
+                    ),
+                    child: Text(
+                      _unreadNotificationsCount > 9
+                          ? '9+'
+                          : _unreadNotificationsCount.toString(),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                ),
+            ],
+          ),
           IconButton(
             icon: const Icon(Icons.person),
             onPressed: () {
@@ -95,7 +167,8 @@ class _HomeScreenState extends State<HomeScreen> {
                       Text('Nom: ${widget.user.fullName}'),
                       Text('Email: ${widget.user.email}'),
                       Text('Rôle: ${widget.user.role}'),
-                      if (widget.user.phone != null) Text('Tél: ${widget.user.phone}'),
+                      if (widget.user.phone != null)
+                        Text('Tél: ${widget.user.phone}'),
                     ],
                   ),
                   actions: [
@@ -126,6 +199,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           );
         },
+        tooltip: 'Ajouter un véhicule',
         child: const Icon(Icons.add),
       )
           : null,

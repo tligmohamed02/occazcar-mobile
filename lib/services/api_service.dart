@@ -5,8 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../models/models.dart';
 
 class ApiService {
-  static const String baseUrl = 'http://10.0.2.2:8085/api'; // Pour émulateur Android
-  // static const String baseUrl = 'http://localhost:8085/api'; // Pour iOS
+  static const String baseUrl = 'http://10.0.2.2:8085/api';
 
   String? _token;
 
@@ -36,7 +35,8 @@ class ApiService {
   }
 
   // Auth
-  Future<User> register(String email, String password, String fullName, String role, String? phone) async {
+  Future<User> register(String email, String password, String fullName,
+      String role, String? phone) async {
     final response = await http.post(
       Uri.parse('$baseUrl/auth/register'),
       headers: {'Content-Type': 'application/json'},
@@ -96,7 +96,8 @@ class ApiService {
     if (minYear != null) queryParams['minYear'] = minYear.toString();
     if (maxYear != null) queryParams['maxYear'] = maxYear.toString();
 
-    final uri = Uri.parse('$baseUrl/vehicles/search').replace(queryParameters: queryParams);
+    final uri = Uri.parse('$baseUrl/vehicles/search')
+        .replace(queryParameters: queryParams);
     final response = await http.get(uri, headers: _getHeaders());
 
     if (response.statusCode == 200) {
@@ -189,7 +190,8 @@ class ApiService {
   }
 
   // Offers
-  Future<Offer> createOffer(int vehicleId, double proposedPrice, String? message) async {
+  Future<Offer> createOffer(int vehicleId, double proposedPrice,
+      String? message) async {
     await _loadToken();
     final response = await http.post(
       Uri.parse('$baseUrl/offers'),
@@ -254,7 +256,8 @@ class ApiService {
   }
 
   // Messages
-  Future<Message> sendMessage(int vehicleId, int receiverId, String content) async {
+  Future<Message> sendMessage(int vehicleId, int receiverId,
+      String content) async {
     await _loadToken();
     final response = await http.post(
       Uri.parse('$baseUrl/messages'),
@@ -307,6 +310,53 @@ class ApiService {
     await _loadToken();
     await http.put(
       Uri.parse('$baseUrl/messages/$messageId/read'),
+      headers: _getHeaders(),
+    );
+  }
+
+  // Notifications
+  Future<List<Map<String, dynamic>>> getNotifications() async {
+    await _loadToken();
+    final response = await http.get(
+      Uri.parse('$baseUrl/notifications'),
+      headers: _getHeaders(),
+    );
+
+    if (response.statusCode == 200) {
+      final List<dynamic> data = jsonDecode(response.body);
+      return data.cast<Map<String, dynamic>>();
+    } else {
+      throw Exception('Erreur lors du chargement des notifications');
+    }
+  }
+
+  Future<int> getUnreadNotificationsCount() async {
+    await _loadToken();
+    final response = await http.get(
+      Uri.parse('$baseUrl/notifications/unread-count'),
+      headers: _getHeaders(),
+    );
+
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      return data['count'] ?? 0;
+    } else {
+      return 0;
+    }
+  }
+
+  Future<void> markNotificationAsRead(int notificationId) async {
+    await _loadToken();
+    await http.put(
+      Uri.parse('$baseUrl/notifications/$notificationId/read'),
+      headers: _getHeaders(),
+    );
+  }
+
+  Future<void> markAllNotificationsAsRead() async {
+    await _loadToken();
+    await http.put(
+      Uri.parse('$baseUrl/notifications/mark-all-read'),
       headers: _getHeaders(),
     );
   }

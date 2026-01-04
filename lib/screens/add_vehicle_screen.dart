@@ -1,4 +1,6 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import '../services/api_service.dart';
 
 class AddVehicleScreen extends StatefulWidget {
@@ -11,6 +13,7 @@ class AddVehicleScreen extends StatefulWidget {
 class _AddVehicleScreenState extends State<AddVehicleScreen> {
   final _formKey = GlobalKey<FormState>();
   final _apiService = ApiService();
+  final _picker = ImagePicker();
   final _brandController = TextEditingController();
   final _modelController = TextEditingController();
   final _yearController = TextEditingController();
@@ -23,9 +26,36 @@ class _AddVehicleScreenState extends State<AddVehicleScreen> {
   String? _selectedFuelType;
   String? _selectedTransmission;
   bool _isLoading = false;
+  List<File> _selectedPhotos = [];
 
   final List<String> _fuelTypes = ['ESSENCE', 'DIESEL', 'ELECTRIQUE', 'HYBRIDE', 'GPL'];
   final List<String> _transmissions = ['MANUELLE', 'AUTOMATIQUE'];
+
+  Future<void> _pickImages() async {
+    try {
+      final pickedFiles = await _picker.pickMultiImage();
+
+      if (pickedFiles.isNotEmpty) {
+        setState(() {
+          _selectedPhotos.addAll(
+            pickedFiles.map((xFile) => File(xFile.path)),
+          );
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erreur: ${e.toString()}')),
+        );
+      }
+    }
+  }
+
+  void _removePhoto(int index) {
+    setState(() {
+      _selectedPhotos.removeAt(index);
+    });
+  }
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
@@ -33,7 +63,8 @@ class _AddVehicleScreenState extends State<AddVehicleScreen> {
     setState(() => _isLoading = true);
 
     try {
-      await _apiService.createVehicle({
+      // Créer le véhicule d'abord
+      final vehicle = await _apiService.createVehicle({
         'brand': _brandController.text,
         'model': _modelController.text,
         'year': int.parse(_yearController.text),
@@ -46,10 +77,21 @@ class _AddVehicleScreenState extends State<AddVehicleScreen> {
         'doors': _doorsController.text.isEmpty ? null : int.parse(_doorsController.text),
       });
 
+      // Upload des photos si disponibles
+      if (_selectedPhotos.isNotEmpty) {
+        await _apiService.uploadPhotos(vehicle.id, _selectedPhotos);
+      }
+
       if (mounted) {
         Navigator.of(context).pop();
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Véhicule ajouté avec succès')),
+          SnackBar(
+            content: Text(
+              _selectedPhotos.isEmpty
+                  ? 'Véhicule ajouté avec succès'
+                  : 'Véhicule et photos ajoutés avec succès',
+            ),
+          ),
         );
       }
     } catch (e) {
@@ -74,6 +116,89 @@ class _AddVehicleScreenState extends State<AddVehicleScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              // Section Photos
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text(
+                            'Photos du véhicule',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          TextButton.icon(
+                            onPressed: _pickImages,
+                            icon: const Icon(Icons.add_photo_alternate),
+                            label: const Text('Ajouter'),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      if (_selectedPhotos.isEmpty)
+                        Container(
+                          height: 100,
+                          decoration: BoxDecoration(
+                            color: Colors.grey[200],
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Center(
+                            child: Text(
+                              'Aucune photo (vous pourrez en ajouter plus tard)',
+                              style: TextStyle(color: Colors.grey),
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
+                        )
+                      else
+                        SizedBox(
+                          height: 120,
+                          child: ListView.builder(
+                            scrollDirection: Axis.horizontal,
+                            itemCount: _selectedPhotos.length,
+                            itemBuilder: (context, index) {
+                              return Stack(
+                                children: [
+                                  Container(
+                                    margin: const EdgeInsets.only(right: 8),
+                                    width: 120,
+                                    decoration: BoxDecoration(
+                                      borderRadius: BorderRadius.circular(8),
+                                      image: DecorationImage(
+                                        image: FileImage(_selectedPhotos[index]),
+                                        fit: BoxFit.cover,
+                                      ),
+                                    ),
+                                  ),
+                                  Positioned(
+                                    top: 4,
+                                    right: 12,
+                                    child: IconButton(
+                                      icon: const Icon(
+                                        Icons.cancel,
+                                        color: Colors.red,
+                                      ),
+                                      onPressed: () => _removePhoto(index),
+                                    ),
+                                  ),
+                                ],
+                              );
+                            },
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // Formulaire
               TextFormField(
                 controller: _brandController,
                 decoration: const InputDecoration(
@@ -224,7 +349,12 @@ class _AddVehicleScreenState extends State<AddVehicleScreen> {
                 ),
                 child: _isLoading
                     ? const CircularProgressIndicator()
-                    : const Text('Publier l\'annonce', style: TextStyle(fontSize: 16)),
+                    : Text(
+                  _selectedPhotos.isEmpty
+                      ? 'Publier l\'annonce'
+                      : 'Publier avec ${_selectedPhotos.length} photo(s)',
+                  style: const TextStyle(fontSize: 16),
+                ),
               ),
             ],
           ),

@@ -13,6 +13,7 @@ class _MyOffersScreenState extends State<MyOffersScreen> {
   final _apiService = ApiService();
   List<Offer> _offers = [];
   bool _isLoading = true;
+  String? _userRole;
 
   @override
   void initState() {
@@ -24,24 +25,28 @@ class _MyOffersScreenState extends State<MyOffersScreen> {
     setState(() => _isLoading = true);
 
     try {
-      final offers = await _apiService.getBuyerOffers();
+      // Essayer de charger les offres vendeur d'abord
+      final sellerOffers = await _apiService.getSellerOffers();
       setState(() {
-        _offers = offers;
+        _offers = sellerOffers;
+        _userRole = 'VENDEUR';
         _isLoading = false;
       });
     } catch (e) {
+      // Si ça échoue, charger les offres acheteur
       try {
-        final offers = await _apiService.getSellerOffers();
+        final buyerOffers = await _apiService.getBuyerOffers();
         setState(() {
-          _offers = offers;
+          _offers = buyerOffers;
+          _userRole = 'ACHETEUR';
           _isLoading = false;
         });
       } catch (e2) {
         if (mounted) {
+          setState(() => _isLoading = false);
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text('Erreur: ${e2.toString()}')),
           );
-          setState(() => _isLoading = false);
         }
       }
     }
@@ -53,7 +58,14 @@ class _MyOffersScreenState extends State<MyOffersScreen> {
       _loadOffers();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Offre mise à jour')),
+          SnackBar(
+            content: Text(
+                status == 'ACCEPTEE'
+                    ? 'Offre acceptée avec succès'
+                    : 'Offre refusée'
+            ),
+            backgroundColor: status == 'ACCEPTEE' ? Colors.green : Colors.red,
+          ),
         );
       }
     } catch (e) {
@@ -76,6 +88,19 @@ class _MyOffersScreenState extends State<MyOffersScreen> {
     }
   }
 
+  String _getStatusText(String status) {
+    switch (status) {
+      case 'EN_ATTENTE':
+        return 'En attente';
+      case 'ACCEPTEE':
+        return 'Acceptée';
+      case 'REFUSEE':
+        return 'Refusée';
+      default:
+        return status;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
@@ -83,15 +108,17 @@ class _MyOffersScreenState extends State<MyOffersScreen> {
     }
 
     if (_offers.isEmpty) {
-      return const Center(
+      return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.local_offer_outlined, size: 80, color: Colors.grey),
-            SizedBox(height: 16),
+            const Icon(Icons.local_offer_outlined, size: 80, color: Colors.grey),
+            const SizedBox(height: 16),
             Text(
-              'Aucune offre',
-              style: TextStyle(fontSize: 18, color: Colors.grey),
+              _userRole == 'VENDEUR'
+                  ? 'Aucune offre reçue'
+                  : 'Aucune offre envoyée',
+              style: const TextStyle(fontSize: 18, color: Colors.grey),
             ),
           ],
         ),
@@ -104,8 +131,11 @@ class _MyOffersScreenState extends State<MyOffersScreen> {
         itemCount: _offers.length,
         itemBuilder: (context, index) {
           final offer = _offers[index];
+          final isVendeur = _userRole == 'VENDEUR';
+
           return Card(
             margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            elevation: 2,
             child: Padding(
               padding: const EdgeInsets.all(16.0),
               child: Column(
@@ -115,12 +145,27 @@ class _MyOffersScreenState extends State<MyOffersScreen> {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Expanded(
-                        child: Text(
-                          '${offer.vehicleBrand} ${offer.vehicleModel}',
-                          style: const TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                          ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              '${offer.vehicleBrand} ${offer.vehicleModel}',
+                              style: const TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              isVendeur
+                                  ? 'De: ${offer.buyerName}'
+                                  : 'Votre offre',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Colors.grey[700],
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                       Container(
@@ -133,7 +178,7 @@ class _MyOffersScreenState extends State<MyOffersScreen> {
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Text(
-                          offer.status,
+                          _getStatusText(offer.status),
                           style: const TextStyle(
                             color: Colors.white,
                             fontSize: 12,
@@ -143,35 +188,73 @@ class _MyOffersScreenState extends State<MyOffersScreen> {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 8),
-                  Text('Acheteur: ${offer.buyerName}'),
-                  if (offer.buyerPhone != null)
-                    Text('Tél: ${offer.buyerPhone}'),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Prix proposé: ${offer.proposedPrice.toStringAsFixed(0)} TND',
-                    style: const TextStyle(
-                      fontSize: 16,
-                      color: Colors.green,
-                      fontWeight: FontWeight.bold,
+                  const Divider(height: 24),
+
+                  if (isVendeur && offer.buyerPhone != null) ...[
+                    Row(
+                      children: [
+                        const Icon(Icons.phone, size: 16, color: Colors.grey),
+                        const SizedBox(width: 8),
+                        Text('Tél: ${offer.buyerPhone}'),
+                      ],
                     ),
-                  ),
-                  if (offer.message != null) ...[
                     const SizedBox(height: 8),
-                    Text('Message: ${offer.message}'),
                   ],
-                  if (offer.status == 'EN_ATTENTE') ...[
+
+                  Row(
+                    children: [
+                      const Icon(Icons.attach_money, size: 16, color: Colors.green),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Prix proposé: ${offer.proposedPrice.toStringAsFixed(0)} TND',
+                        style: const TextStyle(
+                          fontSize: 16,
+                          color: Colors.green,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  if (offer.message != null && offer.message!.isNotEmpty) ...[
                     const SizedBox(height: 12),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.grey[100],
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Message:',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w600,
+                              fontSize: 12,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(offer.message!),
+                        ],
+                      ),
+                    ),
+                  ],
+
+                  if (isVendeur && offer.status == 'EN_ATTENTE') ...[
+                    const SizedBox(height: 16),
                     Row(
                       children: [
                         Expanded(
                           child: ElevatedButton.icon(
                             onPressed: () =>
                                 _updateOfferStatus(offer.id, 'ACCEPTEE'),
-                            icon: const Icon(Icons.check),
+                            icon: const Icon(Icons.check, size: 20),
                             label: const Text('Accepter'),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.green,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 12),
                             ),
                           ),
                         ),
@@ -180,10 +263,12 @@ class _MyOffersScreenState extends State<MyOffersScreen> {
                           child: ElevatedButton.icon(
                             onPressed: () =>
                                 _updateOfferStatus(offer.id, 'REFUSEE'),
-                            icon: const Icon(Icons.close),
+                            icon: const Icon(Icons.close, size: 20),
                             label: const Text('Refuser'),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.red,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 12),
                             ),
                           ),
                         ),

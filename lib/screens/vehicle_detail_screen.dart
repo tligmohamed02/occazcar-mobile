@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/models.dart';
 import '../services/api_service.dart';
 import 'chat_screen.dart';
@@ -19,28 +20,49 @@ class _VehicleDetailScreenState extends State<VehicleDetailScreen> {
   final _priceController = TextEditingController();
   final _messageController = TextEditingController();
   int _currentPhotoIndex = 0;
+  int? _currentUserId;
 
   @override
   void initState() {
     super.initState();
+    _loadCurrentUser();
     _loadVehicle();
+  }
+
+  Future<void> _loadCurrentUser() async {
+    final prefs = await SharedPreferences.getInstance();
+    final userId = prefs.getInt('userId');
+    if (mounted) {
+      setState(() {
+        _currentUserId = userId;
+      });
+    }
   }
 
   Future<void> _loadVehicle() async {
     try {
       final vehicle = await _apiService.getVehicle(widget.vehicleId);
-      setState(() {
-        _vehicle = vehicle;
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _vehicle = vehicle;
+          _isLoading = false;
+        });
+      }
     } catch (e) {
       if (mounted) {
+        setState(() => _isLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Erreur: ${e.toString()}')),
         );
         Navigator.of(context).pop();
       }
     }
+  }
+
+  bool _isOwner() {
+    return _currentUserId != null &&
+        _vehicle != null &&
+        _currentUserId == _vehicle!.sellerId;
   }
 
   Future<void> _makeOffer() async {
@@ -117,6 +139,8 @@ class _VehicleDetailScreenState extends State<VehicleDetailScreen> {
   }
 
   void _openChat() {
+    if (_vehicle == null) return;
+
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (context) => ChatScreen(
@@ -142,6 +166,8 @@ class _VehicleDetailScreenState extends State<VehicleDetailScreen> {
         body: Center(child: Text('Véhicule non trouvé')),
       );
     }
+
+    final isOwner = _isOwner();
 
     return Scaffold(
       appBar: AppBar(
@@ -263,32 +289,57 @@ class _VehicleDetailScreenState extends State<VehicleDetailScreen> {
                   Text('Nom: ${_vehicle!.sellerName}'),
                   if (_vehicle!.sellerPhone != null)
                     Text('Tél: ${_vehicle!.sellerPhone}'),
-                  const SizedBox(height: 24),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: ElevatedButton.icon(
-                          onPressed: _openChat,
-                          icon: const Icon(Icons.chat),
-                          label: const Text('Contacter'),
-                          style: ElevatedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 16),
+
+                  // Afficher les boutons seulement si l'utilisateur n'est PAS le propriétaire
+                  if (!isOwner) ...[
+                    const SizedBox(height: 24),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            onPressed: _openChat,
+                            icon: const Icon(Icons.chat),
+                            label: const Text('Contacter'),
+                            style: ElevatedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                            ),
                           ),
                         ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: ElevatedButton.icon(
-                          onPressed: _showOfferDialog,
-                          icon: const Icon(Icons.local_offer),
-                          label: const Text('Faire une offre'),
-                          style: ElevatedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 16),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            onPressed: _showOfferDialog,
+                            icon: const Icon(Icons.local_offer),
+                            label: const Text('Faire une offre'),
+                            style: ElevatedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                            ),
                           ),
                         ),
+                      ],
+                    ),
+                  ] else ...[
+                    const SizedBox(height: 16),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.blue.shade50,
+                        borderRadius: BorderRadius.circular(8),
                       ),
-                    ],
-                  ),
+                      child: const Row(
+                        children: [
+                          Icon(Icons.info_outline, color: Colors.blue),
+                          SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'C\'est votre annonce',
+                              style: TextStyle(color: Colors.blue),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),
