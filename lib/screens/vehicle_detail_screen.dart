@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/models.dart';
 import '../services/api_service.dart';
+import 'chat_screen.dart';
 
 class VehicleDetailScreen extends StatefulWidget {
   final int vehicleId;
@@ -17,6 +18,7 @@ class _VehicleDetailScreenState extends State<VehicleDetailScreen> {
   bool _isLoading = true;
   final _priceController = TextEditingController();
   final _messageController = TextEditingController();
+  int _currentPhotoIndex = 0;
 
   @override
   void initState() {
@@ -114,6 +116,19 @@ class _VehicleDetailScreenState extends State<VehicleDetailScreen> {
     );
   }
 
+  void _openChat() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => ChatScreen(
+          vehicleId: _vehicle!.id,
+          otherUserId: _vehicle!.sellerId,
+          otherUserName: _vehicle!.sellerName,
+          vehicleName: '${_vehicle!.brand} ${_vehicle!.model}',
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
@@ -136,11 +151,56 @@ class _VehicleDetailScreenState extends State<VehicleDetailScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Container(
+            // Photos carousel
+            SizedBox(
               height: 250,
-              color: Colors.grey[300],
-              child: const Center(
-                child: Icon(Icons.directions_car, size: 100, color: Colors.grey),
+              child: _vehicle!.photos.isEmpty
+                  ? Container(
+                color: Colors.grey[300],
+                child: const Center(
+                  child: Icon(Icons.directions_car,
+                      size: 100, color: Colors.grey),
+                ),
+              )
+                  : Stack(
+                children: [
+                  PageView.builder(
+                    itemCount: _vehicle!.photos.length,
+                    onPageChanged: (index) {
+                      setState(() => _currentPhotoIndex = index);
+                    },
+                    itemBuilder: (context, index) {
+                      return Image.network(
+                        'http://10.0.2.2:8085${_vehicle!.photos[index]}',
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) {
+                          return Container(
+                            color: Colors.grey[300],
+                            child: const Icon(Icons.broken_image, size: 100),
+                          );
+                        },
+                      );
+                    },
+                  ),
+                  Positioned(
+                    bottom: 10,
+                    right: 10,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.black54,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        '${_currentPhotoIndex + 1}/${_vehicle!.photos.length}',
+                        style: const TextStyle(color: Colors.white),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
             Padding(
@@ -151,11 +211,13 @@ class _VehicleDetailScreenState extends State<VehicleDetailScreen> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(
-                        '${_vehicle!.brand} ${_vehicle!.model}',
-                        style: const TextStyle(
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
+                      Expanded(
+                        child: Text(
+                          '${_vehicle!.brand} ${_vehicle!.model}',
+                          style: const TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                       ),
                       Text(
@@ -202,13 +264,30 @@ class _VehicleDetailScreenState extends State<VehicleDetailScreen> {
                   if (_vehicle!.sellerPhone != null)
                     Text('Tél: ${_vehicle!.sellerPhone}'),
                   const SizedBox(height: 24),
-                  ElevatedButton.icon(
-                    onPressed: _showOfferDialog,
-                    icon: const Icon(Icons.local_offer),
-                    label: const Text('Faire une offre'),
-                    style: ElevatedButton.styleFrom(
-                      minimumSize: const Size(double.infinity, 50),
-                    ),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          onPressed: _openChat,
+                          icon: const Icon(Icons.chat),
+                          label: const Text('Contacter'),
+                          style: ElevatedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          onPressed: _showOfferDialog,
+                          icon: const Icon(Icons.local_offer),
+                          label: const Text('Faire une offre'),
+                          style: ElevatedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),

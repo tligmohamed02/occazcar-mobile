@@ -1,11 +1,12 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/models.dart';
 
 class ApiService {
-  static const String baseUrl = 'http://localhost:8085/api'; // Pour émulateur Android
-  // static const String baseUrl = 'http://localhost:8080/api'; // Pour iOS
+  static const String baseUrl = 'http://10.0.2.2:8085/api'; // Pour émulateur Android
+  // static const String baseUrl = 'http://localhost:8085/api'; // Pour iOS
 
   String? _token;
 
@@ -150,6 +151,43 @@ class ApiService {
     }
   }
 
+  // Upload Photos
+  Future<Vehicle> uploadPhotos(int vehicleId, List<File> photos) async {
+    await _loadToken();
+
+    var request = http.MultipartRequest(
+      'POST',
+      Uri.parse('$baseUrl/vehicles/$vehicleId/photos'),
+    );
+
+    request.headers['Authorization'] = 'Bearer $_token';
+
+    for (var photo in photos) {
+      request.files.add(await http.MultipartFile.fromPath('files', photo.path));
+    }
+
+    final streamedResponse = await request.send();
+    final response = await http.Response.fromStream(streamedResponse);
+
+    if (response.statusCode == 200) {
+      return Vehicle.fromJson(jsonDecode(response.body));
+    } else {
+      throw Exception('Erreur lors de l\'upload');
+    }
+  }
+
+  Future<void> deletePhoto(int vehicleId, String photoUrl) async {
+    await _loadToken();
+    final response = await http.delete(
+      Uri.parse('$baseUrl/vehicles/$vehicleId/photos?photoUrl=$photoUrl'),
+      headers: _getHeaders(),
+    );
+
+    if (response.statusCode != 200) {
+      throw Exception('Erreur lors de la suppression');
+    }
+  }
+
   // Offers
   Future<Offer> createOffer(int vehicleId, double proposedPrice, String? message) async {
     await _loadToken();
@@ -213,5 +251,63 @@ class ApiService {
     } else {
       throw Exception(response.body);
     }
+  }
+
+  // Messages
+  Future<Message> sendMessage(int vehicleId, int receiverId, String content) async {
+    await _loadToken();
+    final response = await http.post(
+      Uri.parse('$baseUrl/messages'),
+      headers: _getHeaders(),
+      body: jsonEncode({
+        'vehicleId': vehicleId,
+        'receiverId': receiverId,
+        'content': content,
+      }),
+    );
+
+    if (response.statusCode == 200) {
+      return Message.fromJson(jsonDecode(response.body));
+    } else {
+      throw Exception(response.body);
+    }
+  }
+
+  Future<List<Message>> getConversation(int vehicleId, int otherUserId) async {
+    await _loadToken();
+    final response = await http.get(
+      Uri.parse('$baseUrl/messages/conversation?vehicleId=$vehicleId&otherUserId=$otherUserId'),
+      headers: _getHeaders(),
+    );
+
+    if (response.statusCode == 200) {
+      final List<dynamic> data = jsonDecode(response.body);
+      return data.map((json) => Message.fromJson(json)).toList();
+    } else {
+      throw Exception('Erreur lors du chargement');
+    }
+  }
+
+  Future<List<Conversation>> getMyConversations() async {
+    await _loadToken();
+    final response = await http.get(
+      Uri.parse('$baseUrl/messages/my-conversations'),
+      headers: _getHeaders(),
+    );
+
+    if (response.statusCode == 200) {
+      final List<dynamic> data = jsonDecode(response.body);
+      return data.map((json) => Conversation.fromJson(json)).toList();
+    } else {
+      throw Exception('Erreur lors du chargement');
+    }
+  }
+
+  Future<void> markAsRead(int messageId) async {
+    await _loadToken();
+    await http.put(
+      Uri.parse('$baseUrl/messages/$messageId/read'),
+      headers: _getHeaders(),
+    );
   }
 }

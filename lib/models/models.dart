@@ -138,3 +138,82 @@ class Offer {
     );
   }
 }
+
+class Message {
+  final int id;
+  final int vehicleId;
+  final String vehicleBrand;
+  final String vehicleModel;
+  final int senderId;
+  final String senderName;
+  final int receiverId;
+  final String receiverName;
+  final String content;
+  final bool isRead;
+  final String createdAt;
+
+  Message({
+    required this.id,
+    required this.vehicleId,
+    required this.vehicleBrand,
+    required this.vehicleModel,
+    required this.senderId,
+    required this.senderName,
+    required this.receiverId,
+    required this.receiverName,
+    required this.content,
+    required this.isRead,
+    required this.createdAt,
+  });
+
+  factory Message.fromJson(Map<String, dynamic> json) {
+    return Message(
+      id: json['id'],
+      vehicleId: json['vehicleId'],
+      vehicleBrand: json['vehicleBrand'],
+      vehicleModel: json['vehicleModel'],
+      senderId: json['senderId'],
+      senderName: json['senderName'],
+      receiverId: json['receiverId'],
+      receiverName: json['receiverName'],
+      content: json['content'],
+      isRead: json['isRead'],
+      createdAt: json['createdAt'],
+    );
+  }
+}
+
+class Conversation {
+  final int vehicleId;
+  final String vehicleBrand;
+  final String vehicleModel;
+  final int otherUserId;
+  final String otherUserName;
+  final String lastMessage;
+  final String lastMessageTime;
+  final int unreadCount;
+
+  Conversation({
+    required this.vehicleId,
+    required this.vehicleBrand,
+    required this.vehicleModel,
+    required this.otherUserId,
+    required this.otherUserName,
+    required this.lastMessage,
+    required this.lastMessageTime,
+    required this.unreadCount,
+  });
+
+  factory Conversation.fromJson(Map<String, dynamic> json) {
+    return Conversation(
+      vehicleId: json['vehicleId'],
+      vehicleBrand: json['vehicleBrand'],
+      vehicleModel: json['vehicleModel'],
+      otherUserId: json['otherUserId'],
+      otherUserName: json['otherUserName'],
+      lastMessage: json['lastMessage'],
+      lastMessageTime: json['lastMessageTime'],
+      unreadCount: json['unreadCount'],
+    );
+  }
+}

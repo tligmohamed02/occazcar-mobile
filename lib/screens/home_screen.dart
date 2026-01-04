@@ -4,6 +4,7 @@ import 'search_screen.dart';
 import 'my_vehicles_screen.dart';
 import 'my_offers_screen.dart';
 import 'add_vehicle_screen.dart';
+import 'conversations_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   final User user;
@@ -23,11 +24,13 @@ class _HomeScreenState extends State<HomeScreen> {
         const SearchScreen(),
         const MyVehiclesScreen(),
         const MyOffersScreen(),
+        const ConversationsScreen(),
       ];
     } else {
       return [
         const SearchScreen(),
         const MyOffersScreen(),
+        const ConversationsScreen(),
       ];
     }
   }
@@ -47,6 +50,10 @@ class _HomeScreenState extends State<HomeScreen> {
           icon: Icon(Icons.local_offer),
           label: 'Offres',
         ),
+        BottomNavigationBarItem(
+          icon: Icon(Icons.chat),
+          label: 'Messages',
+        ),
       ];
     } else {
       return const [
@@ -57,6 +64,10 @@ class _HomeScreenState extends State<HomeScreen> {
         BottomNavigationBarItem(
           icon: Icon(Icons.local_offer),
           label: 'Mes offres',
+        ),
+        BottomNavigationBarItem(
+          icon: Icon(Icons.chat),
+          label: 'Messages',
         ),
       ];
     }
@@ -104,6 +115,7 @@ class _HomeScreenState extends State<HomeScreen> {
         currentIndex: _currentIndex,
         onTap: (index) => setState(() => _currentIndex = index),
         items: _getNavItems(),
+        type: BottomNavigationBarType.fixed,
       ),
       floatingActionButton: widget.user.role == 'VENDEUR'
           ? FloatingActionButton(

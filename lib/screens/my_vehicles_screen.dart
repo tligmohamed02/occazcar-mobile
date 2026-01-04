@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../models/models.dart';
 import '../services/api_service.dart';
 import 'vehicle_detail_screen.dart';
+import 'upload_photos_screen.dart';
 
 class MyVehiclesScreen extends StatefulWidget {
   const MyVehiclesScreen({super.key});
@@ -40,6 +41,21 @@ class _MyVehiclesScreenState extends State<MyVehiclesScreen> {
     }
   }
 
+  void _goToUploadPhotos(Vehicle vehicle) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => UploadPhotosScreen(
+          vehicleId: vehicle.id,
+          vehicleName: '${vehicle.brand} ${vehicle.model}',
+        ),
+      ),
+    ).then((uploaded) {
+      if (uploaded == true) {
+        _loadVehicles(); // Recharger pour voir les nouvelles photos
+      }
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
@@ -75,42 +91,88 @@ class _MyVehiclesScreenState extends State<MyVehiclesScreen> {
           final vehicle = _vehicles[index];
           return Card(
             margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: ListTile(
-              leading: const Icon(Icons.directions_car, size: 40),
-              title: Text(
-                '${vehicle.brand} ${vehicle.model}',
-                style: const TextStyle(fontWeight: FontWeight.bold),
-              ),
-              subtitle: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('${vehicle.year} • ${vehicle.mileage} km'),
-                  Text(
-                    '${vehicle.price.toStringAsFixed(0)} TND',
-                    style: const TextStyle(
-                      color: Colors.green,
-                      fontWeight: FontWeight.bold,
+            child: Column(
+              children: [
+                ListTile(
+                  leading: vehicle.photos.isNotEmpty
+                      ? ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: Image.network(
+                      'http://10.0.2.2:8085${vehicle.photos[0]}',
+                      width: 60,
+                      height: 60,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) {
+                        return const Icon(Icons.directions_car, size: 40);
+                      },
                     ),
+                  )
+                      : const Icon(Icons.directions_car, size: 40),
+                  title: Text(
+                    '${vehicle.brand} ${vehicle.model}',
+                    style: const TextStyle(fontWeight: FontWeight.bold),
                   ),
-                  Text(
-                    'Statut: ${vehicle.status}',
-                    style: TextStyle(
-                      color: vehicle.status == 'DISPONIBLE'
-                          ? Colors.green
-                          : Colors.orange,
-                    ),
+                  subtitle: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('${vehicle.year} • ${vehicle.mileage} km'),
+                      Text(
+                        '${vehicle.price.toStringAsFixed(0)} TND',
+                        style: const TextStyle(
+                          color: Colors.green,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.photo,
+                            size: 16,
+                            color: vehicle.photos.isEmpty
+                                ? Colors.red
+                                : Colors.green,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            '${vehicle.photos.length} photo(s)',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: vehicle.photos.isEmpty
+                                  ? Colors.red
+                                  : Colors.green,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
-                ],
-              ),
-              trailing: const Icon(Icons.arrow_forward_ios),
-              onTap: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (context) =>
-                        VehicleDetailScreen(vehicleId: vehicle.id),
+                  trailing: const Icon(Icons.arrow_forward_ios),
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (context) =>
+                            VehicleDetailScreen(vehicleId: vehicle.id),
+                      ),
+                    ).then((_) => _loadVehicles());
+                  },
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: () => _goToUploadPhotos(vehicle),
+                          icon: const Icon(Icons.add_photo_alternate),
+                          label: Text(vehicle.photos.isEmpty
+                              ? 'Ajouter photos'
+                              : 'Gérer photos'),
+                        ),
+                      ),
+                    ],
                   ),
-                ).then((_) => _loadVehicles());
-              },
+                ),
+              ],
             ),
           );
         },
