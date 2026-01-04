@@ -69,35 +69,87 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     }
   }
 
+  void _showProfileDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Profil'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.person, size: 20, color: Colors.grey),
+                const SizedBox(width: 8),
+                Expanded(child: Text('Nom: ${widget.user.fullName}')),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                const Icon(Icons.email, size: 20, color: Colors.grey),
+                const SizedBox(width: 8),
+                Expanded(child: Text('Email: ${widget.user.email}')),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                const Icon(Icons.badge, size: 20, color: Colors.grey),
+                const SizedBox(width: 8),
+                Expanded(child: Text('Rôle: ${widget.user.role}')),
+              ],
+            ),
+            if (widget.user.phone != null) ...[
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  const Icon(Icons.phone, size: 20, color: Colors.grey),
+                  const SizedBox(width: 8),
+                  Expanded(child: Text('Tél: ${widget.user.phone}')),
+                ],
+              ),
+            ],
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Fermer'),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _logout() async {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Déconnexion'),
-        content: const Text('Voulez-vous vraiment vous déconnecter ?'),
+        content: const Text('Êtes-vous sûr de vouloir vous déconnecter ?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
             child: const Text('Annuler'),
           ),
-          ElevatedButton(
+          TextButton(
             onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
-              foregroundColor: Colors.white,
-            ),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
             child: const Text('Déconnexion'),
           ),
         ],
       ),
     );
 
-    if (confirm == true) {
+    if (confirm == true && mounted) {
       await _apiService.clearToken();
       if (mounted) {
-        Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (context) => const LoginScreen()),
-              (route) => false,
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(
+            builder: (context) => const LoginScreen(),
+          ),
         );
       }
     }
@@ -108,13 +160,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       return [
         const SearchScreen(),
         const MyVehiclesScreen(),
-        const MyOffersScreen(),
+        MyOffersScreen(userRole: widget.user.role),
         const ConversationsScreen(),
       ];
     } else {
       return [
         const SearchScreen(),
-        const MyOffersScreen(),
+        MyOffersScreen(userRole: widget.user.role),
         const ConversationsScreen(),
       ];
     }
@@ -166,7 +218,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       appBar: AppBar(
         title: const Text('OccazCar'),
         actions: [
-          // Badge de notifications
           Stack(
             children: [
               IconButton(
@@ -214,33 +265,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             icon: const Icon(Icons.person),
             onSelected: (value) {
               if (value == 'profile') {
-                showDialog(
-                  context: context,
-                  builder: (context) => AlertDialog(
-                    title: const Text('Profil'),
-                    content: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('Nom: ${widget.user.fullName}'),
-                        const SizedBox(height: 8),
-                        Text('Email: ${widget.user.email}'),
-                        const SizedBox(height: 8),
-                        Text('Rôle: ${widget.user.role}'),
-                        if (widget.user.phone != null) ...[
-                          const SizedBox(height: 8),
-                          Text('Tél: ${widget.user.phone}'),
-                        ],
-                      ],
-                    ),
-                    actions: [
-                      TextButton(
-                        onPressed: () => Navigator.pop(context),
-                        child: const Text('Fermer'),
-                      ),
-                    ],
-                  ),
-                );
+                _showProfileDialog();
               } else if (value == 'logout') {
                 _logout();
               }
@@ -251,8 +276,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 child: Row(
                   children: [
                     Icon(Icons.person, size: 20),
-                    SizedBox(width: 12),
-                    Text('Mon profil'),
+                    SizedBox(width: 8),
+                    Text('Profil'),
                   ],
                 ),
               ),
@@ -261,7 +286,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 child: Row(
                   children: [
                     Icon(Icons.logout, size: 20, color: Colors.red),
-                    SizedBox(width: 12),
+                    SizedBox(width: 8),
                     Text('Déconnexion', style: TextStyle(color: Colors.red)),
                   ],
                 ),

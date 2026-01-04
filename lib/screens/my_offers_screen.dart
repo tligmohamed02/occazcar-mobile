@@ -3,7 +3,9 @@ import '../models/models.dart';
 import '../services/api_service.dart';
 
 class MyOffersScreen extends StatefulWidget {
-  const MyOffersScreen({super.key});
+  final String userRole;
+
+  const MyOffersScreen({super.key, required this.userRole});
 
   @override
   State<MyOffersScreen> createState() => _MyOffersScreenState();
@@ -13,7 +15,6 @@ class _MyOffersScreenState extends State<MyOffersScreen> {
   final _apiService = ApiService();
   List<Offer> _offers = [];
   bool _isLoading = true;
-  String? _userRole;
 
   @override
   void initState() {
@@ -25,26 +26,19 @@ class _MyOffersScreenState extends State<MyOffersScreen> {
     setState(() => _isLoading = true);
 
     try {
-      // Essayer de charger les offres vendeur d'abord
-      try {
+      // Charger les offres selon le rôle de l'utilisateur
+      if (widget.userRole == 'VENDEUR') {
         final sellerOffers = await _apiService.getSellerOffers();
-        if (mounted) {
-          setState(() {
-            _offers = sellerOffers;
-            _userRole = 'VENDEUR';
-            _isLoading = false;
-          });
-        }
-      } catch (e) {
-        // Si ça échoue, charger les offres acheteur
+        setState(() {
+          _offers = sellerOffers;
+          _isLoading = false;
+        });
+      } else {
         final buyerOffers = await _apiService.getBuyerOffers();
-        if (mounted) {
-          setState(() {
-            _offers = buyerOffers;
-            _userRole = 'ACHETEUR';
-            _isLoading = false;
-          });
-        }
+        setState(() {
+          _offers = buyerOffers;
+          _isLoading = false;
+        });
       }
     } catch (e) {
       if (mounted) {
@@ -105,6 +99,17 @@ class _MyOffersScreenState extends State<MyOffersScreen> {
     }
   }
 
+  IconData _getStatusIcon(String status) {
+    switch (status) {
+      case 'ACCEPTEE':
+        return Icons.check_circle;
+      case 'REFUSEE':
+        return Icons.cancel;
+      default:
+        return Icons.schedule;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
@@ -119,10 +124,18 @@ class _MyOffersScreenState extends State<MyOffersScreen> {
             const Icon(Icons.local_offer_outlined, size: 80, color: Colors.grey),
             const SizedBox(height: 16),
             Text(
-              _userRole == 'VENDEUR'
+              widget.userRole == 'VENDEUR'
                   ? 'Aucune offre reçue'
                   : 'Aucune offre envoyée',
               style: const TextStyle(fontSize: 18, color: Colors.grey),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              widget.userRole == 'VENDEUR'
+                  ? 'Les offres de vos acheteurs apparaîtront ici'
+                  : 'Recherchez des véhicules et faites des offres',
+              style: const TextStyle(fontSize: 14, color: Colors.grey),
+              textAlign: TextAlign.center,
             ),
           ],
         ),
@@ -135,7 +148,7 @@ class _MyOffersScreenState extends State<MyOffersScreen> {
         itemCount: _offers.length,
         itemBuilder: (context, index) {
           final offer = _offers[index];
-          final isVendeur = _userRole == 'VENDEUR';
+          final isVendeur = widget.userRole == 'VENDEUR';
 
           return Card(
             margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -145,6 +158,7 @@ class _MyOffersScreenState extends State<MyOffersScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // En-tête avec véhicule et statut
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -162,7 +176,7 @@ class _MyOffersScreenState extends State<MyOffersScreen> {
                             const SizedBox(height: 4),
                             Text(
                               isVendeur
-                                  ? 'De: ${offer.buyerName}'
+                                  ? 'Offre de: ${offer.buyerName}'
                                   : 'Votre offre',
                               style: TextStyle(
                                 fontSize: 14,
@@ -181,19 +195,31 @@ class _MyOffersScreenState extends State<MyOffersScreen> {
                           color: _getStatusColor(offer.status),
                           borderRadius: BorderRadius.circular(12),
                         ),
-                        child: Text(
-                          _getStatusText(offer.status),
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                          ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              _getStatusIcon(offer.status),
+                              color: Colors.white,
+                              size: 16,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              _getStatusText(offer.status),
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ],
                   ),
                   const Divider(height: 24),
 
+                  // Informations de contact (seulement pour le vendeur)
                   if (isVendeur && offer.buyerPhone != null) ...[
                     Row(
                       children: [
@@ -205,6 +231,7 @@ class _MyOffersScreenState extends State<MyOffersScreen> {
                     const SizedBox(height: 8),
                   ],
 
+                  // Prix proposé
                   Row(
                     children: [
                       const Icon(Icons.attach_money, size: 16, color: Colors.green),
@@ -220,6 +247,7 @@ class _MyOffersScreenState extends State<MyOffersScreen> {
                     ],
                   ),
 
+                  // Message de l'offre
                   if (offer.message != null && offer.message!.isNotEmpty) ...[
                     const SizedBox(height: 12),
                     Container(
@@ -245,6 +273,23 @@ class _MyOffersScreenState extends State<MyOffersScreen> {
                     ),
                   ],
 
+                  // Date de l'offre
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Icon(Icons.access_time, size: 14, color: Colors.grey[600]),
+                      const SizedBox(width: 4),
+                      Text(
+                        _formatDate(offer.createdAt),
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey[600],
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  // Boutons d'action pour le vendeur
                   if (isVendeur && offer.status == 'EN_ATTENTE') ...[
                     const SizedBox(height: 16),
                     Row(
@@ -279,6 +324,52 @@ class _MyOffersScreenState extends State<MyOffersScreen> {
                       ],
                     ),
                   ],
+
+                  // Message d'information pour l'acheteur selon le statut
+                  if (!isVendeur && offer.status != 'EN_ATTENTE') ...[
+                    const SizedBox(height: 12),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: offer.status == 'ACCEPTEE'
+                            ? Colors.green.shade50
+                            : Colors.red.shade50,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: offer.status == 'ACCEPTEE'
+                              ? Colors.green
+                              : Colors.red,
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            offer.status == 'ACCEPTEE'
+                                ? Icons.celebration
+                                : Icons.info_outline,
+                            color: offer.status == 'ACCEPTEE'
+                                ? Colors.green
+                                : Colors.red,
+                            size: 20,
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              offer.status == 'ACCEPTEE'
+                                  ? 'Félicitations ! Le vendeur a accepté votre offre. Vous pouvez le contacter pour finaliser l\'achat.'
+                                  : 'Le vendeur a décliné votre offre. Vous pouvez rechercher d\'autres véhicules.',
+                              style: TextStyle(
+                                color: offer.status == 'ACCEPTEE'
+                                    ? Colors.green.shade800
+                                    : Colors.red.shade800,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -286,5 +377,27 @@ class _MyOffersScreenState extends State<MyOffersScreen> {
         },
       ),
     );
+  }
+
+  String _formatDate(String dateString) {
+    try {
+      final date = DateTime.parse(dateString);
+      final now = DateTime.now();
+      final difference = now.difference(date);
+
+      if (difference.inDays > 7) {
+        return '${date.day}/${date.month}/${date.year}';
+      } else if (difference.inDays > 0) {
+        return 'Il y a ${difference.inDays} jour${difference.inDays > 1 ? "s" : ""}';
+      } else if (difference.inHours > 0) {
+        return 'Il y a ${difference.inHours} heure${difference.inHours > 1 ? "s" : ""}';
+      } else if (difference.inMinutes > 0) {
+        return 'Il y a ${difference.inMinutes} minute${difference.inMinutes > 1 ? "s" : ""}';
+      } else {
+        return 'À l\'instant';
+      }
+    } catch (e) {
+      return dateString;
+    }
   }
 }
